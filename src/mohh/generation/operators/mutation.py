@@ -24,16 +24,12 @@ class Mutation(GeneticOperator):
         :return: Mutated genomes.
         """
 
-        # Initialise empty population
         new_pop = []
 
-        # Iterate over the current population
         for ind in population:
 
-            # Perform mutation
             new_genome = self.run(ind)
 
-            # Append the mutated individual
             new_pop.append(new_genome)
         
         return new_pop

@@ -1,24 +1,32 @@
 
+
 import copy
 import numpy as np
 
+
 from mohh.evaluation.params import Params
 
+
 from abc import ABC, abstractmethod
+
 
 from mohh.evaluation.problem.instance import Instance
 from mohh.core.utilities.load_modules import find_module
 from mohh.evaluation.operators.operator_template import NullMutation
 
+
 from pymoo.core.evaluator import Evaluator
 from pymoo.core.population import Population
 from pymoo.util.ref_dirs import get_reference_directions
+
 
 from pymoo.algorithms.moo.moead import MOEAD
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.algorithms.moo.sms import SMSEMOA
 
+
 from pymoo.core.callback import Callback
+
 
 class MyCallback(Callback):
 
@@ -26,7 +34,7 @@ class MyCallback(Callback):
         super().__init__()
         self.populations = {}
 
-        # Convert evaluation budgets into the generation at which they're reached.
+        # budget -> generation checkpoint
         self.checkpoints = {label: max(1, budget // population_size)
                             for label, budget in eval_budgets.items()}
 
@@ -50,13 +58,10 @@ class MOSolver(ABC):
         Initialize solver for an operator
         """
 
-        # Load parameters
         params = Params()
 
-        # Multiobjective parameters
         self.generations = params["MO_GENERATIONS"]
 
-        # Multiobjective operators
         self.crossover = None
         self.mutation = None
 
@@ -72,39 +77,32 @@ class MOSolver(ABC):
         @param operator_name: Name of the operator.
         """
 
-        # Handle algorithms with no mutation
         if operator_type == "mutation" and operator_name == "NullMutation":
             self.mutation = NullMutation()
 
         else:
-            # Load operator
             module_name = f"mohh.evaluation.operators.{operator_type}"
             operator = find_module(module_name, operator_name, **kwargs)
 
-            # Dynamically set the attribute based on operator_type
             operator_type = "crossover" if operator_type == "operator_template" else operator_type
             setattr(self, operator_type, operator)
-        
+
         return self
 
     def load_instance(self, instance: Instance):
         """
         Load an instance object and copy its initial solution.
-        
+
         @param instance: Instance object.
         """
-        
-        # Load problem
+
         self.problem = copy.deepcopy(instance.problem)
 
-        # Start with initial population
         self.pop = Population.new("X", instance.initial_solutions.copy())
 
-        # Extract information from the instance
         self.pop_size = instance.population_size
         self.k_objectives = instance.k_objectives
 
-        # Evaluate the initial solutions
         Evaluator().eval(self.problem, self.pop)
 
     @abstractmethod
@@ -113,7 +111,7 @@ class MOSolver(ABC):
         Start the MOEA.
         """
         return
-    
+
     @abstractmethod
     def solve_instance(self):
         """
@@ -126,19 +124,16 @@ class MOEA_Decomposition(MOSolver):
 
     def __init__(self) -> None:
         super().__init__()
-    
+
     def start_model(self, seed):
         """
         Start the MOEA.
         """
 
-        # Load parameters
         params = Params()
 
-        # Create reference directions
         ref_dirs = get_reference_directions("uniform", self.k_objectives, n_points=self.pop_size)
 
-        # Build algorithm
         self.algorithm = MOEAD(
             ref_dirs=ref_dirs,
             n_neighbors=params["NUM_NEGIHBORS"],
@@ -151,7 +146,7 @@ class MOEA_Decomposition(MOSolver):
         self.algorithm.setup(self.problem, termination=("n_gen", self.generations),
                              verbose=False, seed=seed,
                              callback=MyCallback(self.pop_size, params["EVAL_BUDGETS"]))
-    
+
     def solve_instance(self):
         """
         MOEA execution
@@ -159,28 +154,13 @@ class MOEA_Decomposition(MOSolver):
 
         while self.algorithm.has_next():
 
-            # Ask the algorithm for the next population
             pop = self.algorithm.ask()
 
-            # Evaluate population
             self.algorithm.evaluator.eval(self.problem, pop)
 
-            # Return the evaluated individuals
             self.algorithm.tell(infills=pop)
 
-        # Extract callback data
         snapshots_data = self.algorithm.callback.populations
-
-        # Legacy: this used to be the return value, before MyCallback/snapshots_data.
-        # Kept here in case per-run pareto set/front stats are needed again.
-        #results = self.algorithm.result()
-        #pareto_set = results.X
-        #pareto_front = results.F
-        #number_weak_non_dominated = len(pareto_set)
-        #number_unique_results = len(np.unique(pareto_set, axis=0))
-        #pareto_front, mask = np.unique(pareto_front, return_index=True, axis=0)
-        #pareto_set = pareto_set[mask]
-        #number_unique_pareto_front = len(pareto_front)
 
         return snapshots_data
 
@@ -196,19 +176,15 @@ class NSGAII(MOSolver):
         @param seed: Random seed.
         """
 
-        # Load parameters
         params = Params()
 
-        # Build algorithm
         self.algorithm = NSGA2(
             pop_size=self.pop_size,
             sampling=self.pop,
             crossover=self.crossover,
             mutation=self.mutation
         )
-        # Implicit operators
-        # Tournament selection
-        # Survival RankandCrowding
+        # tournament + rank&crowding survival
 
         self.algorithm.setup(self.problem, termination=("n_gen", self.generations),
                              verbose=False, seed=seed,
@@ -221,16 +197,12 @@ class NSGAII(MOSolver):
 
         while self.algorithm.has_next():
 
-            # Ask the algorithm for the next population
             pop = self.algorithm.ask()
 
-            # Evaluate population
             self.algorithm.evaluator.eval(self.problem, pop)
 
-            # Return the evaluated individuals
             self.algorithm.tell(infills=pop)
 
-        # Extract callback data
         snapshots_data = self.algorithm.callback.populations
 
         return snapshots_data
@@ -247,19 +219,15 @@ class SMS_MOEA(MOSolver):
         @param seed: Random seed.
         """
 
-        # Load parameters
         params = Params()
 
-        # Build algorithm
         self.algorithm = SMSEMOA(
             pop_size=self.pop_size,
             sampling=self.pop,
             crossover=self.crossover,
             mutation=self.mutation
         )
-        # Implicit operators
-        # Tournament selection
-        # Survival LeastHypervolumeContributionSurvival
+        # tournament + HV-contribution survival
 
         self.algorithm.setup(self.problem, termination=("n_gen", self.generations),
                              verbose=False, seed=seed,
@@ -272,16 +240,12 @@ class SMS_MOEA(MOSolver):
 
         while self.algorithm.has_next():
 
-            # Ask the algorithm for the next population
             pop = self.algorithm.ask()
 
-            # Evaluate population
             self.algorithm.evaluator.eval(self.problem, pop)
 
-            # Return the evaluated individuals
             self.algorithm.tell(infills=pop)
 
-        # Extract callback data
         snapshots_data = self.algorithm.callback.populations
 
         return snapshots_data

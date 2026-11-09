@@ -1,12 +1,17 @@
 
+
 import random
 
+
 from mohh.generation.representation.population import Individual
+
 
 from mohh.generation.params import Params
 from mohh.generation.operators.operator import GeneticOperator
 
+
 params = Params()
+
 
 class Initialization(GeneticOperator):
     """
@@ -27,10 +32,10 @@ class Initialization(GeneticOperator):
         individuals = self.run(population_size)
         return individuals
 
-
     def run(self):
         return super().run()
-    
+
+
 class Rvd(Initialization):
     """
     RVD Initialisation method.
@@ -38,13 +43,12 @@ class Rvd(Initialization):
     def __init__(self):
         super().__init__()
 
-
     def run(self, size: int) -> list:
         """
         Create a random population discarding invalids and duplicates.
 
         @param size: The population size.
-    
+
         @return: A full population of individuals.
         """
         tries = 0
@@ -66,7 +70,8 @@ class Rvd(Initialization):
                 population.append(ind)
 
         return population
-    
+
+
 def sample_genome() -> list:
     """
     Generate a random genome, uniformly.
@@ -76,5 +81,5 @@ def sample_genome() -> list:
 
     genome = [random.randint(0, params["CODON_SIZE"]) for _ in
               range(params["INIT_GENOME_LENGTH"])]
-    
+
     return genome

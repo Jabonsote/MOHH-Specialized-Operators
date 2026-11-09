@@ -6,13 +6,10 @@ class Population():
 
     def __init__(self, operator) -> None:
         
-        # Store individuals
         self.individuals = []
 
-        # Initialization method
         self.initialize_operator = operator
 
-        # Keep record of the number of individuals
         self.num_individuals_created = 0
 
     def initialize_population(self, population_size: int):
@@ -22,13 +19,10 @@ class Population():
         @param population_size: Number of individuals to create.
         """
 
-        # Store data
         self.population_size = population_size
 
-        # Make use of the operator to start a population
         self.individuals = self.initialize_operator.run(self.population_size)
 
-        # Add a name to each individual
         for i in range(self.population_size):
             self.individuals[i].name = f"Individual_{self.num_individuals_created+1:06d}"
             self.num_individuals_created += 1
@@ -128,32 +122,26 @@ class Individual():
         @param map_required: Bool to indicate if it needs to be mapped first.
         """
 
-        # Load params
         params = Params()
 
         if map_required:
-            # Map the individual
             self.phenotype, self.genome, self.tree, self.nodes, self.invalid, \
             self.depth, self.used_codons = mapper(genome)
 
         else:
             self.genome, self.tree = genome, None
         
-        # Add individual information
         self.name = None
         self.evaluated = False
         self.is_offspring = False
         self.runtime_error = None
 
-        # Optimization information
         self.maximize = params["OPTIMIZATION_KIND"]
 
-        # Determine sign for domination comparison
         self.sign = 1
         if not(self.maximize):
             self.sign = -1
         
-        # Variables to store results
         self.hypervolumes = dict()
         self.fitness_values = dict()
 

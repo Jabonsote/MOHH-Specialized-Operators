@@ -8,7 +8,6 @@ def find_module(module_name: str, operator_name: str, **kwargs: dict) -> object:
     """
     
     try:
-        # Import module.
         module = importlib.import_module(module_name)
         
     except ModuleNotFoundError:
@@ -18,7 +17,6 @@ def find_module(module_name: str, operator_name: str, **kwargs: dict) -> object:
     if not kwargs:
         kwargs = dict()
 
-    # Find the class in the module
     for name, obj in inspect.getmembers(module, inspect.isclass):
         if name == operator_name:
             return obj(**kwargs)

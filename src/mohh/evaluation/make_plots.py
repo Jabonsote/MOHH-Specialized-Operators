@@ -13,13 +13,10 @@ def sort_columns_by_prefix(df):
     first_column = columns[0]
     other_columns = columns[1:]
 
-    # Custom order
     custom_order = ["SBX", "PMX", "Best", "Middle", "Worst"]
 
-    # Map for custom order
     type_order_index = {key: i for i, key in enumerate(custom_order)}
 
-    # Sort by Solver, then by type, then by mutation
     sorted_columns = sorted(other_columns, key=lambda x: (
         x.split("_")[0], # Solver
         type_order_index.get(x.split("_")[1], float("inf")), # Type
@@ -35,7 +32,6 @@ def sort_columns_by_prefix(df):
 
 def create_repeated_color_code(n):
 
-    # Generate n random colors
     base_colors = np.random.choice(['b', 'g', 'r', 'c', 'm', 'y', 'k'], size=n, replace=False)
     base_colors = ["cadetblue", "limegreen", "orange", "red"]
     repeated_colors = base_colors * n
@@ -59,7 +55,6 @@ def plot_boxplots_grouped(df, instance_name, folder_path,
     num_groups = len(groups)
     color_code = create_repeated_color_code(num_groups)
 
-    # Plot box plots per column, grouped with spaces
     plt.figure(figsize=(10,6))
     positions = []
     tick_labels = []
@@ -89,12 +84,10 @@ def plot_boxplots_grouped(df, instance_name, folder_path,
     plt.tight_layout()
 
     if save:
-        # Make folder for figures
         figures_folders = os.path.join(folder_path, "Figures")
         mutation_folder = os.path.join(figures_folders, "WithMutation")
         no_mutation_folder = os.path.join(figures_folders, "NoMutation")
 
-        # Save figures
         if with_mutation:
             os.makedirs(mutation_folder, exist_ok=True)
             save_name = os.path.join(mutation_folder, instance_name + "_WM" + ".png")
@@ -114,7 +107,6 @@ def make_figures(folder_path: str):
     solver_names = params["SOLVERS"]
     eval_steps = list(params["EVAL_BUDGETS"].keys())
 
-    # Compute the limits of all solutions per instance (Visual purposes)
     instance_boundaries = {}
 
     for solver in solver_names:
@@ -123,7 +115,7 @@ def make_figures(folder_path: str):
 
             solver_path = os.path.join(folder_path, solver, evals)
 
-            # A budget may be unreached if MO_GENERATIONS was too small
+            # budget unreached
             if not os.path.isdir(solver_path):
                 continue
 
@@ -134,54 +126,44 @@ def make_figures(folder_path: str):
                 if not instance.endswith(".csv"):
                     continue
 
-                # Load dataframe
                 df = pd.read_csv(os.path.join(solver_path, instance))
 
                 instance_name = instance.removesuffix(".csv")
 
-                # Get max and min values
                 max_hv = df.iloc[:,1:].max().max()
                 min_hv = df.iloc[:,1:].min().min()
 
                 if not (np.isfinite(min_hv) and np.isfinite(max_hv)):
-                    # Degenerate front upstream (vmax - vmin was zero) left this
-                    # combination's HVs as NaN - skip it instead of poisoning
-                    # the instance's boundaries with it.
+                    # degenerate front (vmax==vmin) -> NaN, skip
                     print(f"Skipping boundary from {solver}/{evals}/{instance_name}: non-finite HV (degenerate front).")
                     continue
 
-                # Load actual boundaries
                 new_boundaries = instance_boundaries.get(instance_name, [float("inf"), float("-inf")])
 
-                # Extract values
                 current_min_hv = new_boundaries[0]
                 current_max_hv = new_boundaries[1]
 
-                # Compare
                 if current_min_hv > min_hv:
                     new_boundaries[0] = min_hv
 
                 if current_max_hv < max_hv:
                     new_boundaries[1] = max_hv
 
-                # Update boundaries
                 instance_boundaries[instance_name] = new_boundaries
 
-    # Increase each extrema by 5%
     for key, (low, high) in instance_boundaries.items():
         interval_range = high - low
         new_low = low - 0.05 * interval_range
         new_high = high + 0.05 * interval_range
         instance_boundaries[key] = [new_low, new_high]
 
-    # Make plots
     for solver in solver_names:
 
         for evals in eval_steps:
 
             solver_path = os.path.join(folder_path, solver, evals)
 
-            # A budget may be unreached if MO_GENERATIONS was too small
+            # budget unreached
             if not os.path.isdir(solver_path):
                 continue
 
@@ -200,20 +182,16 @@ def make_figures(folder_path: str):
 
                 low, high = instance_boundaries.get(instance_name, [float("inf"), float("-inf")])
                 if not (np.isfinite(low) and np.isfinite(high)):
-                    # Every contribution to this instance's boundaries was
-                    # degenerate (see the skip above) - nothing valid to plot.
+                    # all HVs degenerate: nothing to plot
                     print(f"Skipping plots for {solver}/{evals}/{instance_name}: no finite boundaries.")
                     continue
 
-                # Divide by Mutation and No-Mutation
                 whole_columns = df.columns
                 no_mutation_cols = ["Experiment"] + [col for col in whole_columns if "_NM_" in col]
                 mutation_cols    = ["Experiment"] + [col for col in whole_columns if "_WM_" in col]
 
-                # Plot without mutation
                 plot_boxplots_grouped(df[no_mutation_cols], instance_name, solver_path, solver, instance_boundaries[instance_name], evals, save=True)
 
-                # Plot with mutation
                 plot_boxplots_grouped(df[mutation_cols], instance_name, solver_path, solver, instance_boundaries[instance_name], evals, with_mutation=True, save=True)
 
 

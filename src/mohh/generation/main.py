@@ -5,13 +5,10 @@ from mohh.core.utilities.instance_utils import instance_paths
 
 def execute_generation(mo_model: str, experiment_path: str, overrides: dict = None) -> str:
 
-    # First set the parameters of the experiment
     set_params(experiment_path, mo_model, overrides)
 
-    # Load params
     params = Params()
 
-    # Assemble an algorithm with its operators
     algorithm = (HyperHeuristic()
                  .load_operator("initialization", params["INITIALIZATION"])
                  .load_operator("selection", "Tournament", k=params["TOURNAMENT_SIZE"])
@@ -21,19 +18,17 @@ def execute_generation(mo_model: str, experiment_path: str, overrides: dict = No
 
     algorithm.mo_model_name = mo_model
 
-    # Get instances
     instances = instance_paths(train=True)
 
-    # Load instances to solve / train
     algorithm.load_instances(instances)
 
-    # Execute algorithm
     algorithm.run()
 
-    # Reset params singleton
     params_dict = params.get_params()
     params.reset_instance()
 
-    # Return the path with the last generation operators
+    from mohh.core.utilities.metrics import RunMetrics
+    RunMetrics.reset_instance()
+
     return params_dict["FILE_PATH"], params_dict["FILE_PATH_GENERATIONS"], params_dict["FILE_PATH_INDIVIDUALS"], params_dict["ELITE_SIZE"]
 

@@ -22,7 +22,6 @@ class Selection(GeneticOperator):
         :return: A pair of parents.
         """
 
-        # Initialize an empty variable for selected individuals
         indices = []
         parents = []
 
@@ -64,17 +63,12 @@ class Tournament(Selection):
         :return: parent
         """
 
-        # Choose a subset k randomly
         selected_candidates = random.sample(list(enumerate(population)), self.sample_size)
 
-        # Separete indices from individuals
         indices, candidates = list(zip(*selected_candidates))
 
-        # Extract the scores for the selected candidates
         candidates_scores = [scores[i] for i in indices]
 
-        # Get the index of the min score
         winner_index = candidates_scores.index(min(candidates_scores))
 
-        # Return the winner candidate
         return candidates[winner_index], indices[winner_index]

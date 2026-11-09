@@ -33,6 +33,7 @@ multi-objective Quadratic Assignment Problem (mQAP).
 - [Data](#data)
 - [Configuration reference](#configuration-reference)
 - [Algorithms](#algorithms)
+- [Known limitations](#known-limitations)
 - [Output format](#output-format)
 
 ---
@@ -190,7 +191,7 @@ mohh-evaluate results/Experiment_001 --models MOEAD --solvers MOEAD,NSGAII \
 
 To confirm the pipeline works end-to-end without waiting for a full-scale
 run (the published-scale defaults - 50/30 generations, 105/300-500 MOEA
-population/generations, 11 repeated experiments - can take a long time):
+population/generations, 31 repeated experiments - can take a long time):
 
 ```bash
 mohh-run --full --models MOEAD --population-size 8 --generations 2 \
@@ -221,6 +222,7 @@ MOHH/
     ├── cli.py                       <- mohh-generate / mohh-evaluate / mohh-run
     ├── main.py                      <- run_generation: orchestrates one or more generation models
     ├── run_evaluation.py            <- discover_models / extract_operators (reads *_operators.txt)
+    ├── parallel.py                  <- simple process-pool parallelization (run_parallel)
     ├── core/                        <- shared by both stages
     │   ├── params.py                <- Params singleton (dict-like global config)
     │   ├── representation/
@@ -236,7 +238,7 @@ MOHH/
     │       ├── load_modules.py      <- string-name -> operator class dynamic dispatch
     │       ├── paths.py             <- project_root()
     │       └── print_utils.py       <- in-place CLI progress line updates
-    │
+    │ 
     ├── generation/                  <- the GE search stage
     │   ├── params.py                <- generation defaults + set_params(experiment_path, model, overrides)
     │   ├── saver.py                 <- PopulationSaver / MyLogger singletons
@@ -271,28 +273,83 @@ dispatches on a `model_name` string and is built fresh per candidate operator (m
 snapshotting (`MyCallback`) for the benchmarking sweep. They share a name and a role but not a
 contract, do not assume one's API from the other.
 
+> **IMPORTANT — project rule:** Modifying the logic of the MOEAs is **forbidden**
+> (`Prohibido modificar`). This fork only *parallelizes* the independent MOEA runs.
+> No algorithm logic was touched (mating, decomposition, ask/tell, problem evaluation,
+> operators); the results/state updates applied after each run are identical to the
+> sequential version.
+
+### Parallelization (process pool, all cores)
+
+The independent MOEA runs are executed on all available cores via a simple
+process pool — parallelism comes from running *separate MOEA instances*
+concurrently, not from changing how a single MOEA advances.
+
+- `mohh/parallel.py` — `run_parallel(fn, tasks, on_complete=None)`: creates a
+  `ProcessPoolExecutor` with one worker per CPU (dynamic, capped by the number
+  of tasks) and returns the results in task order. Falls back to a plain
+  sequential loop for a single task or single core. The optional `on_complete(i)`
+  callback is invoked in the main process as each task finishes so the original
+  `tqdm` progress bars stay live (they advance while solving, exactly as in the
+  sequential version) instead of jumping at the end.
+- **Generation (search)** — `HyperHeuristic.evaluation_step` builds one task per
+  (candidate operator × training instance) and each worker runs that inner MOEA
+  (`generation/algorithm/hyperheuristic.py::_solve_individual_instance`). The
+  main process then applies the exact same updates as before (pareto sets/fronts,
+  consolidated fronts, metrics).
+- **Evaluation** — `run_experiments` builds one task per repeated experiment
+  (`evaluation/experiment.py::_solve_experiment_task`); this applies to **all**
+  solvers benchmarked (MOEAD, NSGAII, SMSEMOA). Each worker reproduces the same
+  global seeds (`random.seed`, `np.random.seed`) as the sequential loop, so the
+  evaluation results are comparable run-to-run. Generation seeds
+  `np.random.seed(seed)` per independent run for reproducibility (the RNG stream
+  is no longer shared across serial candidates).
+
 ---
 
 ## Data
 
 `datasets/mqap/{train,test}/` hold mQAP instances in the Knowles-Corne
-(`KC`) benchmark format. Filename encodes the instance: `KC{n}-{k}fl-{tag}`,
-e.g. `KC20-2fl-3rl` = 20 facilities, 2 flow matrices (objectives), variant
-`3rl`. Each file starts with a header line, followed by the distance matrix
-and one flow matrix per objective:
+(`KC`) benchmark format. Filename encodes the instance: `KC{n}-{k}fl-{id}{tag}`,
+e.g. `KC47-4fl-1rl` = 47 facilities, 4 flow matrices (objectives), variant
+`1rl`. Each file starts with a header line, followed by the distance matrix
+and one flow matrix per objective, **with a blank line between consecutive
+matrices**:
 
 ```
-facilities= 20 objectives= 2 max_distances= ... max_flows= ... overlap= ... seed= ...
+facilities = 47 objectives = 4 max_distances = 176 max flows = 99352 overlap = 0.70 seed = 23553480
 <N x N distance matrix>
+<blank line>
 <N x N flow matrix, objective 1>
-<N x N flow matrix, objective 2>
+<blank line>
 ...
 ```
 
-Training instances (used only by `mohh-generate`) are smaller (`KC10`,
-`KC20`, `KC30`); test instances (used only by `mohh-evaluate`) are held out
-to check that discovered operators generalize rather than overfit the
-training set.
+The header key depends on the variant: `rl` files carry `overlap=`, `un` files
+carry `correlation=`. Both variants are present in both splits.
+
+| split | instances | facilities (`n`) | objectives (`k`) | variants |
+|-------|-----------|------------------|------------------|----------|
+| `train/` | **80** | 13 - 100 (56 distinct) | 2: 9, 3: 31, 4: 28, 5: 12 | 42 `rl`, 38 `un` |
+| `test/`  | **20** | 11 - 100 (19 distinct) | 2: 7, 3: 3, 4: 5, 5: 5 | 8 `rl`, 12 `un` |
+
+Training instances (used only by `mohh-generate`) and test instances (used
+only by `mohh-evaluate`) are disjoint; the test split is held out to check
+that discovered operators generalize rather than overfit the training set.
+
+> **Note on the file format:** the loader (`core/problem/instance.py`) reads
+> the flow matrices with the offsets `(i+1)*n+1+i` / `(i+2)*n+1+i`, which land
+> exactly on the right blocks *because* there is exactly one blank separator
+> line between matrices. A file with a different number of separators would be
+> misaligned silently.
+
+> `datasets/mqap/{train,test}-metadata.csv` are the generator manifests of
+> these instances (80 and 20 rows, one per file). They are keyed by
+> `(type, n, m, rho, seed)` and still carry the original `uni_*.txt` /
+> `rl_*.txt` filenames instead of the current `KC*.txt` ones; match them with
+> the `(n, m, seed)` triple. For `un` instances `rho` equals the header's
+> `correlation`; for `rl` instances the header carries the fixed family
+> parameter `overlap = 0.70` while the per-instance `rho` is only in the CSV.
 
 ---
 
@@ -327,7 +384,7 @@ mo_params = {
 # evaluation/params.py
 mo_params = {
     'SOLVERS': ["MOEAD", "NSGAII", "SMSEMOA"],   # benchmarked by default
-    'N_EXPERIMENTS': 11,                          # repeats per instance/operator/solver
+    'N_EXPERIMENTS': 31,                         # repeats per instance/operator/solver
     # 10500/31500/52500 = 105 (MO_POPULATION_SIZE) * 100/300/500 generations -
     # these are the published evaluation numbers.
     'EVAL_BUDGETS': {"10k": 10500, "30k": 31500, "50k": 52500},
@@ -371,6 +428,51 @@ The active grammar builds operator expressions from these primitives
 wired into any current entry point.
 
 **The grammar can be extended and modified once its non-terminals are programmed accordingly**
+
+---
+
+## Known limitations
+
+### MOEA/D in the evaluation stage needs a valid reference-direction size
+
+`evaluation/algorithms.py` builds the MOEA/D reference directions with
+`get_reference_directions("uniform", k, n_points=MO_POPULATION_SIZE)`. A
+uniform simplex only exists for specific cardinalities, so the evaluation
+stage aborts whenever `MO_POPULATION_SIZE` is not one of them:
+
+| `MO_POPULATION_SIZE` | k=2 | k=3 | k=4 | k=5 |
+|----------------------|-----|-----|-----|-----|
+| **105** (default) | OK | OK | **error** | **error** |
+| 10 | OK | OK | OK | **error** |
+| 20 | OK | **error** | OK | **error** |
+
+With the published default of 105 this hits every 4- and 5-objective
+instance, i.e. 33 of the 80 training and 10 of the 20 test instances:
+
+```
+Exception: The number of points (n_points = 105) can not be created uniformly.
+Either choose n_points = 84 (n_partitions = 6) or n_points = 120 (n_partitions = 7).
+```
+
+The **generation** stage is not affected: `generation/algorithm/multiobjective.py`
+picks the closest `n_partitions` and resizes the inner population to match
+(k=4 -> 120 points, k=5 -> 126 with `MO_POPULATION_SIZE = 105`). Applying the
+same adaptation to the evaluation stage makes the whole test split runnable;
+it only changes how the reference directions are chosen, not the MOEA logic.
+
+### Hypervolume can collapse to 0 for individual experiments
+
+The evaluation stage normalizes each front with the `min`/`max` of the
+*non-dominated* subset of the consolidated front, but an individual
+experiment's front may contain points that are dominated in the union and
+therefore fall outside that box. After normalization those points exceed the
+reference point (`1.1`), contribute nothing to the hypervolume, and if *all*
+of a front's points end up outside, the reported HV is `0.0`. This is
+independent of the instance set, but it is more likely with small budgets or
+with fronts that are dominated by the union of the other configurations.
+Clipping the normalized front to `[0, 1]`, or normalizing with the
+`min`/`max` of the full consolidated set instead of the non-dominated subset,
+removes it.
 
 ---
 
