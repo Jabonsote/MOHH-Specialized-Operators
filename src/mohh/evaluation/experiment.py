@@ -207,15 +207,6 @@ def _solve_experiment_task(task: dict) -> dict:
     }
 
 
-def normalize(data: np.ndarray):
-
-    if data.shape[1] > 1:
-        return (data - np.min(data, axis=0)) / (np.max(data, axis=0) - np.min(data, axis=0))
-
-    else:
-        return (data - min(data)) / (max(data) - min(data))
-
-
 def normalize_values(data: np.ndarray, vmin: float, vmax: float):
 
     return (data - vmin) / (vmax - vmin)

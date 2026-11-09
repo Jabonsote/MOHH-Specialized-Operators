@@ -1,17 +1,38 @@
 
 import time
+from math import comb
 
 import numpy as np
 
 from mohh.core.params import Params
 from mohh.core.utilities.metrics import RunMetrics
 from pymoo.indicators.hv import HV
+from pymoo.util.ref_dirs import get_reference_directions
 
 params = Params()
 
 sign = 1
 if not(params["OPTIMIZATION_KIND"]):
     sign = -1
+
+
+def reference_directions_for_size(k_objectives: int, target_size: int):
+    """
+    Uniform reference directions with a size pymoo accepts.
+
+    get_reference_directions(..., n_points=N) only accepts sizes of the form
+    C(p + k - 1, k - 1), so for some k there is no N equal to the target
+    (105 points with k=4 or k=5, for instance). Pick the closest partition and
+    return the directions with their actual size.
+    """
+    partitions = min(
+        range(1, max(1, target_size) + 1),
+        key=lambda p: abs(comb(p + k_objectives - 1, k_objectives - 1) - target_size)
+    )
+
+    ref_dirs = get_reference_directions("uniform", k_objectives, n_partitions=partitions)
+
+    return ref_dirs, len(ref_dirs)
 
 
 def dominates_vectorized(p, q):

@@ -433,32 +433,25 @@ wired into any current entry point.
 
 ## Known limitations
 
-### MOEA/D in the evaluation stage needs a valid reference-direction size
+### MOEA/D runs with a different population size on 4- and 5-objective instances
 
-`evaluation/algorithms.py` builds the MOEA/D reference directions with
-`get_reference_directions("uniform", k, n_points=MO_POPULATION_SIZE)`. A
-uniform simplex only exists for specific cardinalities, so the evaluation
-stage aborts whenever `MO_POPULATION_SIZE` is not one of them:
+A uniform simplex only exists for specific cardinalities (`C(p+k-1, k-1)`),
+so `MO_POPULATION_SIZE = 105` is not a valid reference-direction count for
+k=4 or k=5. Both stages therefore pick the closest valid partition and
+resize the population to match (`core/utilities/algorithm/MO.py::
+reference_directions_for_size`):
 
-| `MO_POPULATION_SIZE` | k=2 | k=3 | k=4 | k=5 |
-|----------------------|-----|-----|-----|-----|
-| **105** (default) | OK | OK | **error** | **error** |
-| 10 | OK | OK | OK | **error** |
-| 20 | OK | **error** | OK | **error** |
+| k | directions | generations for 10k / 30k / 50k |
+|---|-----------|-------------------------------|
+| 2 | 105 | 100 / 300 / 500 |
+| 3 | 105 | 100 / 300 / 500 |
+| 4 | **120** | 87 / 262 / 437 |
+| 5 | **126** | 83 / 250 / 416 |
 
-With the published default of 105 this hits every 4- and 5-objective
-instance, i.e. 33 of the 80 training and 10 of the 20 test instances:
-
-```
-Exception: The number of points (n_points = 105) can not be created uniformly.
-Either choose n_points = 84 (n_partitions = 6) or n_points = 120 (n_partitions = 7).
-```
-
-The **generation** stage is not affected: `generation/algorithm/multiobjective.py`
-picks the closest `n_partitions` and resizes the inner population to match
-(k=4 -> 120 points, k=5 -> 126 with `MO_POPULATION_SIZE = 105`). Applying the
-same adaptation to the evaluation stage makes the whole test split runnable;
-it only changes how the reference directions are chosen, not the MOEA logic.
+The evaluation budget is kept in evaluations, so the deviation is below 1%.
+NSGA-II and SMS-EMOA keep `MO_POPULATION_SIZE` as is, so MOEA/D works with a
+slightly larger population (and fewer generations) than the other two solvers
+on those instances.
 
 ### Hypervolume can collapse to 0 for individual experiments
 

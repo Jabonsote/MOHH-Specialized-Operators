@@ -71,9 +71,6 @@ class RunMetrics:
         self._wall_start = time.perf_counter()
         return self
 
-    def set_enabled(self, enabled: bool):
-        self.enabled = bool(enabled)
-
     def set_info(self, key, value):
         """Record persistent metadata (kept for every dump + the summary)."""
         self._meta[key] = value

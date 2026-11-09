@@ -2,6 +2,8 @@
 from mohh.core.representation.population import Population as _Population
 from mohh.core.representation.population import Individual
 
+__all__ = ["Population", "Individual"]
+
 class Population(_Population):
 
     def get_genome_usage(self) -> list:

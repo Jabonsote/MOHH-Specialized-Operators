@@ -11,14 +11,6 @@ def cos(x:np.ndarray) -> np.ndarray:
     return np.cos(x)
 
 
-def exp(x:np.ndarray) -> np.ndarray:
-    return np.exp(x)
-
-
-def log(x:np.ndarray) -> np.ndarray:
-    return np.log(x)
-
-
 def convolution(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """
     Arity: 2
@@ -35,7 +27,6 @@ def one_point(parent1:np.ndarray, parent2:np.ndarray):
 
     crossover_point = np.random.randint(1, min(len(parent1), len(parent2)) - 1)
     child1 = np.concatenate((parent1[:crossover_point], parent2[crossover_point:]))
-    child2 = np.concatenate((parent2[:crossover_point], parent1[crossover_point:]))
     return child1
 
 
@@ -57,22 +48,6 @@ def masked_cross(parent1:np.ndarray, parent2:np.ndarray):
     child2[mask] = parent2[mask]
 
     return child1
-
-
-def swap(x):
-    """
-    Swap two variables from a solution
-    """
-
-    x = verify_inputs(x)
-
-    n_var = len(x)
-
-    i, j = np.random.choice(n_var, size=2, replace=False)
-
-    x[i], x[j] = x[j], x[i]
-
-    return x
 
 
 def move_right(x):
@@ -136,49 +111,6 @@ def alternate_elements(x, y):
 
     _, indx = np.unique(new_x, return_index=True)
     new_x = new_x[np.sort(indx)]
-
-    _, indx = np.unique(new_y, return_index=True)
-    new_y = new_y[np.sort(indx)]
-
-    return new_x, new_y
-
-
-# Alternate_segments unused
-def alternate_segments(x, y):
-    """
-    Alternate list segments.
-
-    x and y are list of lists.
-    The number of sublists must match
-    """
-
-    if len(x) != len(y):
-        print("Alternate segments: No of Sublists doesn't match.")
-        raise(ValueError)
-
-    new_x = []
-    new_y = []
-
-    for i in range(len(x)):
-
-        if np.random.rand() < 0.5:
-            new_x.extend(x[i])
-            new_x.extend(y[i])
-
-            new_y.extend(y[i])
-            new_y.extend(x[i])
-
-        else:
-            new_x.extend(y[i])
-            new_x.extend(x[i])
-
-            new_y.extend(x[i])
-            new_y.extend(y[i])
-
-    new_x, new_y = np.array(new_x), np.array(new_y)
-
-    _, indx = np.unique(new_x, return_index=True)
-    new_x = new_x[np.sort(new_x)]
 
     _, indx = np.unique(new_y, return_index=True)
     new_y = new_y[np.sort(indx)]

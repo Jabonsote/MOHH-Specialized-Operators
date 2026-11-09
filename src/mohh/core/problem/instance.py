@@ -290,17 +290,6 @@ class QuadraticAssignment(Problem):
 
         out["F"] = values
 
-    def cost_of_solution(self, function_indx:int, solution:np.ndarray):
-        """
-        Return the cost of a solution in its respective function
-        Current complexity: O(n^2)
-        """
-        permuted_positions = self.positions[np.ix_(solution, solution)]
-
-        total_cost = np.sum(self.weights[function_indx] * permuted_positions)
-
-        return total_cost // 2
-
 
 class MOSampling(Sampling):
 

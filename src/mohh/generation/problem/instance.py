@@ -1,3 +1,5 @@
 
 from mohh.core.problem.instance import Instance
 from mohh.core.problem.instance import QuadraticAssignment, MOSampling
+
+__all__ = ["Instance", "QuadraticAssignment", "MOSampling"]

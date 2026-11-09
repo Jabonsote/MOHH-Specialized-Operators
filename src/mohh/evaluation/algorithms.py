@@ -11,13 +11,13 @@ from abc import ABC, abstractmethod
 
 
 from mohh.evaluation.problem.instance import Instance
+from mohh.core.utilities.algorithm.MO import reference_directions_for_size
 from mohh.core.utilities.load_modules import find_module
 from mohh.evaluation.operators.operator_template import NullMutation
 
 
 from pymoo.core.evaluator import Evaluator
 from pymoo.core.population import Population
-from pymoo.util.ref_dirs import get_reference_directions
 
 
 from pymoo.algorithms.moo.moead import MOEAD
@@ -132,7 +132,18 @@ class MOEA_Decomposition(MOSolver):
 
         params = Params()
 
-        ref_dirs = get_reference_directions("uniform", self.k_objectives, n_points=self.pop_size)
+        # Reference directions with a size valid for this many objectives
+        ref_dirs, self.pop_size = reference_directions_for_size(self.k_objectives,
+                                                                self.pop_size)
+
+        # MOEA/D needs one initial solution per reference direction
+        if len(self.pop) > self.pop_size:
+            self.pop = self.pop[:self.pop_size]
+
+        elif len(self.pop) < self.pop_size:
+            extra = Population.new("X", self.pop[:self.pop_size - len(self.pop)].get("X"))
+            Evaluator().eval(self.problem, extra)
+            self.pop = Population.merge(self.pop, extra)
 
         self.algorithm = MOEAD(
             ref_dirs=ref_dirs,
