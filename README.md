@@ -442,11 +442,6 @@ reference_directions_for_size`):
 | 4 | **120** | 87 / 262 / 437 |
 | 5 | **126** | 83 / 250 / 416 |
 
-The evaluation budget is kept in evaluations, so the deviation is below 1%.
-NSGA-II and SMS-EMOA keep `MO_POPULATION_SIZE` as is, so MOEA/D works with a
-slightly larger population (and fewer generations) than the other two solvers
-on those instances.
-
 ### Hypervolume can collapse to 0 for individual experiments
 
 The evaluation stage normalizes each front with the `min`/`max` of the
