@@ -442,19 +442,23 @@ reference_directions_for_size`):
 | 4 | **120** | 87 / 262 / 437 |
 | 5 | **126** | 83 / 250 / 416 |
 
-### Hypervolume can collapse to 0 for individual experiments
+### Instances to skip: their hypervolume collapses to 0
 
-The evaluation stage normalizes each front with the `min`/`max` of the
-*non-dominated* subset of the consolidated front, but an individual
-experiment's front may contain points that are dominated in the union and
-therefore fall outside that box. After normalization those points exceed the
-reference point (`1.1`), contribute nothing to the hypervolume, and if *all*
-of a front's points end up outside, the reported HV is `0.0`. This is
-independent of the instance set, but it is more likely with small budgets or
-with fronts that are dominated by the union of the other configurations.
-Clipping the normalized front to `[0, 1]`, or normalizing with the
-`min`/`max` of the full consolidated set instead of the non-dominated subset,
-removes it.
+The evaluation normalizes with the `min`/`max` of the non-dominated subset of
+the consolidated front, so the reference point is the maximum of that subset.
+When the subset is tiny, almost every front falls outside it and its HV is
+`0.0`. These five test instances are the affected ones (non-dominated points
+of the consolidated front, out of the whole union):
+
+| instance | union | non-dominated | HV = 0 |
+|----------|-------|---------------|--------|
+| `KC77-2fl-1un` | 7.639 | 12 - 24 | 91% |
+| `KC100-5fl-1un` | 43.857 | 78 - 112 | 90% |
+| `KC18-4fl-1un` | 8.516 | 19 - 25 | 85% |
+| `KC45-2fl-1un` | 12.406 | 13 - 35 | 43% |
+| `KC63-3fl-1un` | 41.025 | 82 - 132 | 37% |
+
+Skip them, or fix the normalization, before comparing operators.
 
 ---
 
