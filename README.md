@@ -273,12 +273,6 @@ dispatches on a `model_name` string and is built fresh per candidate operator (m
 snapshotting (`MyCallback`) for the benchmarking sweep. They share a name and a role but not a
 contract, do not assume one's API from the other.
 
-> **IMPORTANT — project rule:** Modifying the logic of the MOEAs is **forbidden**
-> (`Prohibido modificar`). This fork only *parallelizes* the independent MOEA runs.
-> No algorithm logic was touched (mating, decomposition, ask/tell, problem evaluation,
-> operators); the results/state updates applied after each run are identical to the
-> sequential version.
-
 ### Parallelization (process pool, all cores)
 
 The independent MOEA runs are executed on all available cores via a simple
